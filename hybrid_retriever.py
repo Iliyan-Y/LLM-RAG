@@ -28,7 +28,7 @@ class HybridRetriever(BaseRetriever):
         super().__init__(
             db=db,
             embeddings=embeddings,
-            k=k,
+            k=k, # chunks to retrieve per query
             rewrite_query=rewrite_query,
             llm_model=ChatOllama(model=ollama_model),
             logging=False,
@@ -37,17 +37,30 @@ class HybridRetriever(BaseRetriever):
 
         self._rewrite_prompt = PromptTemplate(
             input_variables=["question"],
-            template="Rewrite this into a clear, standalone query for searching a knowledge base:\n\n{question}"
+            template="Rewrite this into a clear, standalone query for searching a knowledge base stored in vectorstore FAISS:\n\n{question}"
         )
         self._rewrite_chain = LLMChain(llm=self.llm_model, prompt=self._rewrite_prompt)
 
         self._hyde_prompt = PromptTemplate(
             input_variables=["question"],
-            template=(
-                "You are an expert researcher. Write a hypothetical, detailed answer "
-                "to the question below, even if you are not sure of the real answer. "
-                "Focus on facts, terminology, and relevant concepts.\n\nQuestion: {question}"
+            template = (
+                "You are a financial filings expert specializing in U.S. public company disclosures. "
+                "Generate a hypothetical but detailed answer to the question below as if it were extracted from 10-Q or 10-K filings of NYSE-listed companies. "
+                "Use realistic financial terminology, section headers, and language commonly found in SEC filings, including: "
+                "Management's Discussion and Analysis (MD&A) "
+                "Risk Factors "
+                "Financial Statements and Notes "
+                "Liquidity and Capital Resources "
+                "Market Risk Disclosures "
+                "Include relevant KPIs (EPS, net income, revenue, cash flow, total assets, liabilities, debt-to-equity ratio), dates, fiscal periods, industry terms, and compliance language. "
+                "The goal is to create a richly detailed passage containing as many potentially relevant concepts and terms as possible to maximize matching with real filings in the knowledge base. "
+                "Question: {question}"
             )
+            # template=(
+            #     "You are an expert researcher. Write a hypothetical, detailed answer "
+            #     "to the question below, even if you are not sure of the real answer. "
+            #     "Focus on facts, terminology, and relevant concepts related to the provided data from the knowledge base.\n\nQuestion: {question}"
+            # )
         )
         self._hyde_chain = LLMChain(llm=self.llm_model, prompt=self._hyde_prompt)
 
@@ -83,20 +96,25 @@ class HybridRetriever(BaseRetriever):
             variations = self._multiquery(hyde_text)
         else:
             variations = [query]
-
+        
         if (self.logging):
             print(f"-  Rewritten query: {rewritten}")
             print(f"- Found {len(variations)} variations for hyde query: {hyde_text}")
 
         seen = set()
         all_docs = []
-        score_threshold = 0.8  # adjust as needed
+        score_threshold = 0.7  #0.8 is good starting point, adjust as needed
         
         for v in variations:
             results = self.db.similarity_search_with_score(v, k=self.k)  # returns (doc, score)
             for doc, score in results:
-                if score >= score_threshold and doc.page_content not in seen:
+                doc_id = (doc.metadata['source'], doc.metadata['chunk_index'])
+                if doc_id not in seen and score >= score_threshold:
                     all_docs.append(doc)
-                    seen.add(doc.page_content)
+                    seen.add(doc_id)
+                # if score >= score_threshold and doc.page_content not in seen:
+                #     all_docs.append(doc)
+                #     seen.add(doc.page_content)
+        all_docs.sort(key=lambda x: x.metadata['chunk_index'])
         print(f"Found {len(all_docs)}")
         return all_docs

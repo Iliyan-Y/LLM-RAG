@@ -40,7 +40,7 @@ db = FAISS.load_local(VECTORSTORE_DIR, embeddings, allow_dangerous_deserializati
 
 # default retriever
 # retriever = db.as_retriever()
-retriever = HybridRetriever(db=db, embeddings=embeddings, ollama_model=OLLAMA_MODEL, rewrite_query=True, k=6)
+retriever = HybridRetriever(db=db, embeddings=embeddings, ollama_model=OLLAMA_MODEL, rewrite_query=True, k=12) # k is the number of chunks to retrieve
 
 # 2. LLM (Ollama)
 try:

@@ -52,7 +52,7 @@ for pdf_path in pdf_files:
     docs = loader.load()
     
     # 3. Chunking while preserving metadata
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=50)
     chunks = splitter.split_documents(docs)
     
     # 4. Add metadata to each chunk
