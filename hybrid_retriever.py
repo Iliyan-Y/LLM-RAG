@@ -14,6 +14,7 @@ class HybridRetriever(BaseRetriever):
     k: int = Field(default=6)
     rewrite_query: bool = Field(default=True)
     llm_model: object = Field(default=None)
+    logging: bool = Field(default=False)
 
     # Private attributes for internal use (not part of Pydantic schema)
     _rewrite_prompt: PromptTemplate = PrivateAttr()
@@ -30,6 +31,7 @@ class HybridRetriever(BaseRetriever):
             k=k,
             rewrite_query=rewrite_query,
             llm_model=ChatOllama(model=ollama_model),
+            logging=False,
             **kwargs
         )
 
@@ -75,11 +77,16 @@ class HybridRetriever(BaseRetriever):
         return variations
 
     def _get_relevant_documents(self, query: str) -> List[Document]:
-        rewritten = self._rewrite(query)
-        hyde_text = self._hyde(rewritten)
-        variations = self._multiquery(hyde_text)
-        print(f"-  Rewritten query: {rewritten}")
-        print(f"- Found {len(variations)} variations for hyde query: {hyde_text}")
+        if (self.rewrite_query):
+            rewritten = self._rewrite(query)
+            hyde_text = self._hyde(rewritten)
+            variations = self._multiquery(hyde_text)
+        else:
+            variations = [query]
+
+        if (self.logging):
+            print(f"-  Rewritten query: {rewritten}")
+            print(f"- Found {len(variations)} variations for hyde query: {hyde_text}")
 
         seen = set()
         all_docs = []

@@ -15,6 +15,8 @@ import os
 import sys
 from glob import glob
 from langchain.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.embeddings import HuggingFaceEmbeddings
 
 PDF_DIR = "./pdfs"
 VECTORSTORE_DIR = "./vectorstore"
@@ -31,32 +33,41 @@ if not os.path.exists(PDF_DIR):
     print(f"PDF directory '{PDF_DIR}' not found. Please create it and add your PDFs.")
     sys.exit(1)
 
-pdf_files = glob(os.path.join(PDF_DIR, "*.pdf"))
+pdf_files = glob(os.path.join(PDF_DIR, "**", "*.pdf"), recursive=True)
 if not pdf_files:
     print(f"No PDF files found in '{PDF_DIR}'. Please add PDFs to index.")
     sys.exit(1)
 
-all_docs = []
+all_chunks = []
+
+# 2. Process each PDF
 for pdf_path in pdf_files:
     print(f"Loading: {pdf_path}")
+    
+    # Extract directory name (category) and file name
+    dir_name = os.path.basename(os.path.dirname(pdf_path))
+    file_name = os.path.basename(pdf_path)
+    
     loader = PyPDFLoader(pdf_path)
     docs = loader.load()
-    all_docs.extend(docs)
+    
+    # 3. Chunking while preserving metadata
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    chunks = splitter.split_documents(docs)
+    
+    # 4. Add metadata to each chunk
+    for i, chunk in enumerate(chunks):
+        chunk.metadata.update({
+            "source": file_name,
+            "category": dir_name,
+            "chunk_index": i,
+           # "keywords": extract_keywords(chunk.page_content) // optional later on for keywords for hybrid search
+        })
+        all_chunks.append(chunk)
 
-# 2. Chunking
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-
-splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-chunks = splitter.split_documents(all_docs)
-print(f"Total chunks: {len(chunks)}")
+print(f"Total chunks: {len(all_chunks)}")
 
 # 3. Embeddings
-try:
-    from langchain.embeddings import HuggingFaceEmbeddings
-except ImportError:
-    print("Missing langchain or sentence-transformers. Install with: pip install langchain sentence-transformers")
-    sys.exit(1)
-
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 # 4. Vector DB (FAISS)

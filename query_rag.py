@@ -40,7 +40,7 @@ db = FAISS.load_local(VECTORSTORE_DIR, embeddings, allow_dangerous_deserializati
 
 # default retriever
 # retriever = db.as_retriever()
-retriever = HybridRetriever(db=db, embeddings=embeddings, ollama_model=OLLAMA_MODEL, rewrite_query=False, k=6)
+retriever = HybridRetriever(db=db, embeddings=embeddings, ollama_model=OLLAMA_MODEL, rewrite_query=True, k=6)
 
 # 2. LLM (Ollama)
 try:
@@ -53,7 +53,7 @@ llm = ChatOllama(model=OLLAMA_MODEL)
 
 # 3. RetrievalQA Chain
 from langchain.chains import RetrievalQA
-qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
+qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever, return_source_documents=True)
 
 # 4. Query loop
 print("RAG Query Interface. Type your question and press Enter (Ctrl+C to exit).")
@@ -64,6 +64,8 @@ while True:
             continue
         response = qa_chain.invoke(query)
         print("Answer:", response["result"])
+        for doc in response["source_documents"]:
+            print(f"Source: {doc.metadata['source']}, Chunk: {doc.metadata['chunk_index']}")
     except KeyboardInterrupt:
         print("\nExiting.")
         break
