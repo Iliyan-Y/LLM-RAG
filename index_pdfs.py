@@ -68,7 +68,7 @@ for pdf_path in pdf_files:
 print(f"Total chunks: {len(all_chunks)}")
 
 # 3. Embeddings
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")
 
 # 4. Vector DB (FAISS)
 try:
