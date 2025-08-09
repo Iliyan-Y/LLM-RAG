@@ -13,6 +13,7 @@ Requirements:
 
 import os
 import sys
+from hybrid_retriever import HybridRetriever
 
 VECTORSTORE_DIR = "./vectorstore"
 OLLAMA_MODEL = "gemma3:latest"  # Change to your preferred model
@@ -36,11 +37,14 @@ if not os.path.exists(VECTORSTORE_DIR):
 
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 db = FAISS.load_local(VECTORSTORE_DIR, embeddings, allow_dangerous_deserialization=True)
-retriever = db.as_retriever()
+
+# default retriever
+# retriever = db.as_retriever()
+retriever = HybridRetriever(db=db, embeddings=embeddings, ollama_model=OLLAMA_MODEL, rewrite_query=False, k=6)
 
 # 2. LLM (Ollama)
 try:
-    from langchain.chat_models import ChatOllama
+    from langchain_community.chat_models import ChatOllama
 except ImportError:
     print("Missing langchain or ollama. Install with: pip install langchain ollama")
     sys.exit(1)
