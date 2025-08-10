@@ -7,11 +7,17 @@ from util.colors import bcolors
 from langchain_community.chat_models import ChatOllama
 from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
+
+from util.hybrid_retriever_base import QueryProps
 load_dotenv()
 
 VECTORSTORE_DIR = os.getenv('VECTORSTORE_DIR')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL')
 SEMANTIC_MODEL_NAME = os.getenv('SEMANTIC_MODEL_NAME')
+TOTAL_CHUNK_CONTEXT = 12
+
+# Options for narrowing the sematic search scope
+qp = QueryProps(rewrite_query=True, allow_multi_query=False, allow_hyde=False)
 
 if not os.path.exists(VECTORSTORE_DIR):
     print(f"{bcolors.FAIL}Vectorstore directory '{VECTORSTORE_DIR}' not found. Run index_pdfs.py first.{bcolors.ENDC}")
@@ -20,9 +26,8 @@ if not os.path.exists(VECTORSTORE_DIR):
 embeddings = HuggingFaceEmbeddings(model_name=SEMANTIC_MODEL_NAME)#all-mpnet-base-v2 all-MiniLM-L6-v2
 db = FAISS.load_local(VECTORSTORE_DIR, embeddings, allow_dangerous_deserialization=True)
 
-# default retriever
-# retriever = db.as_retriever()
-retriever = HybridRetriever(db=db, embeddings=embeddings, ollama_model=OLLAMA_MODEL, rewrite_query=False, k=12, logging=True) # k is the number of chunks to retrieve
+ 
+retriever = HybridRetriever(db=db, embeddings=embeddings, ollama_model=OLLAMA_MODEL, query_props=qp, k=TOTAL_CHUNK_CONTEXT, logging=True) 
 
 # 2. LLM (Ollama)
 llm = ChatOllama(model=OLLAMA_MODEL)

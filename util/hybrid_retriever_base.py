@@ -10,12 +10,20 @@ from langchain_core.retrievers import BaseRetriever
 from langchain_community.chat_models import ChatOllama
 from pydantic import Field, PrivateAttr
 
+class QueryProps:
+  def __init__(self,  rewrite_query: bool, allow_multi_query: bool, allow_hyde: bool):
+    self.rewrite_query = rewrite_query #Allow llm to rewrite the user prop for better semantic search
+    self.allow_multi_query = allow_multi_query # Generate multiple variations of the query
+    self.allow_hyde = allow_hyde # Generates hypothetical document based on the user's query
+
+defaultQueryProps = QueryProps(rewrite_query=False, allow_multi_query=False, allow_hyde=False)
+
 class HybridRetrieverBase(BaseRetriever):
     # Declare these so Pydantic allows them
     db: object = Field(...)
     embeddings: object = Field(...)
     k: int = Field(default=6)
-    rewrite_query: bool = Field(default=True)
+    query_props: object = Field(default=defaultQueryProps)
     llm_model: object = Field(default=None)
     logging: bool = Field(default=False)
 
@@ -27,12 +35,12 @@ class HybridRetrieverBase(BaseRetriever):
     _multiquery_prompt: PromptTemplate = PrivateAttr()
     _multiquery_chain: LLMChain = PrivateAttr()
 
-    def __init__(self, db, embeddings, ollama_model="llama2", rewrite_query=True, k=6, logging=False, **kwargs):
+    def __init__(self, db, embeddings, ollama_model="llama2", query_props= defaultQueryProps, k=6, logging=False, **kwargs):
         super().__init__(
             db=db,
             embeddings=embeddings,
             k=k,  # chunks to retrieve per query
-            rewrite_query=rewrite_query,
+            query_props=query_props,
             llm_model=ChatOllama(model=ollama_model),
             logging=logging,
             **kwargs
@@ -40,7 +48,7 @@ class HybridRetrieverBase(BaseRetriever):
 
         self._rewrite_prompt = PromptTemplate(
             input_variables=["question"],
-            template="Rewrite this into a clear, standalone query for searching a knowledge base stored in vectorstore FAISS:\n\n{question}"
+            template="Convert the following prompt into a concise, self-contained query optimized for semantic search in a FAISS knowledge base. Keep all essential meaning, remove irrelevant context.: \n\n{question}"
         )
         self._rewrite_chain = LLMChain(llm=self.llm_model, prompt=self._rewrite_prompt)
 
@@ -72,8 +80,6 @@ class HybridRetrieverBase(BaseRetriever):
         self._multiquery_chain = LLMChain(llm=self.llm_model, prompt=self._multiquery_prompt)
 
     def _rewrite(self, query: str) -> str:
-        if not self.rewrite_query:
-            return query
         output = self._rewrite_chain.invoke(query)
         return output["text"].strip()
 

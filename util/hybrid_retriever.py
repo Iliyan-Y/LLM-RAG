@@ -5,23 +5,33 @@ from util.colors import bcolors
 from util.hybrid_retriever_base import HybridRetrieverBase
 
 class HybridRetriever(HybridRetrieverBase):
-    def _get_relevant_documents(self, query: str) -> List[Document]:
-        # 1) Query rewriting + HYDE + multiquery
-        if self.rewrite_query:
+
+    def _handle_query_props(self, query: str) -> Tuple[str, List[str]]:
+        rewritten = query
+        hyde_text = query
+        variations = [query]
+
+        if self.query_props.rewrite_query:
             rewritten = self._rewrite(query)
-            hyde_text = self._hyde(rewritten)
+            hyde_text = rewritten
+            if self.logging:
+                print(f"{bcolors.WARNING}- Rewritten: {rewritten}{bcolors.ENDC}")
+
+        if self.query_props.allow_hyde:
+            hyde_text = self._hyde(hyde_text)
+            if self.logging:
+                print(f"{bcolors.FAIL}- Hyde: {hyde_text}{bcolors.ENDC}")
+
+        if self.query_props.allow_multi_query:
             variations = self._multiquery(hyde_text)
+            if self.logging:
+                print(f"{bcolors.OKCYAN}- Variations: {variations}{bcolors.ENDC}")
         else:
-            rewritten = query
-            variations = [query]
+            variations = [hyde_text]
+        return rewritten, variations
 
-        if self.logging and self.rewrite_query:
-            print(f"{bcolors.OKGREEN}Found {len(variations)} variations{bcolors.ENDC}")
-            print(f"{bcolors.WARNING}- Rewritten: {rewritten}{bcolors.ENDC}")
-            print(f"{bcolors.OKGREEN}- HYDE: {hyde_text}{bcolors.ENDC}")
-            for v in variations:
-                print(f"{bcolors.HEADER}- Variation: {v}{bcolors.ENDC}")
-
+    def _get_relevant_documents(self, query: str) -> List[Document]:
+        rewritten, variations = self._handle_query_props(query)
         # Derive company hints from the (rewritten) user query
         company_hints = self._extract_company_hints(rewritten)
         if self.logging and (company_hints["tickers"] or company_hints["names"]):
