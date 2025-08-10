@@ -1,32 +1,24 @@
-"""
-Index PDFs for RAG: Chunk, embed, and store in FAISS vector DB with enriched SEC metadata.
-
-Usage:
-    python3 index_pdfs.py
-
-Requirements:
-    pip install langchain faiss-cpu sentence-transformers pypdf
-
-- Place all your PDFs in the ./pdfs/ directory.
-- The vector DB will be saved to ./vectorstore/
-"""
-
 import os
 import sys
 import re
 from glob import glob
 from datetime import datetime
 from typing import Dict, Optional
-
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.vectorstores import FAISS
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
-PDF_DIR = "./pdfs"
-VECTORSTORE_DIR = "./vectorstore"
-CHUNK_SIZE = 450
-CHUNK_OVERLAP = 50
+PDF_DIR = os.getenv('PDF_DIR')
+VECTORSTORE_DIR = os.getenv('VECTORSTORE_DIR')
+SEMANTIC_MODEL_NAME = os.getenv('SEMANTIC_MODEL_NAME')#all-mpnet-base-v2" || intfloat/e5-base-v2
+
+CHUNK_SIZE = 350 * 4 # 350 characters * 4 Approx for English finance text  
+CHUNK_OVERLAP = 70 * 4
 
 def _parse_date(text: str) -> Optional[str]:
     """
@@ -218,15 +210,9 @@ for pdf_path in pdf_files:
 print(f"Total chunks: {len(all_chunks)}")
 
 # Embeddings
-embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")
+embeddings = HuggingFaceEmbeddings(model_name=SEMANTIC_MODEL_NAME)
 
 # Vector DB (FAISS)
-try:
-    from langchain.vectorstores import FAISS
-except ImportError:
-    print("Missing faiss-cpu. Install with: pip install faiss-cpu")
-    sys.exit(1)
-
 print("Building vector DB...")
 db = FAISS.from_documents(all_chunks, embeddings)
 
@@ -234,3 +220,4 @@ db = FAISS.from_documents(all_chunks, embeddings)
 os.makedirs(VECTORSTORE_DIR, exist_ok=True)
 db.save_local(VECTORSTORE_DIR)
 print(f"Vector DB saved to '{VECTORSTORE_DIR}'")
+os.system('afplay /System/Library/Sounds/Hero.aiff')

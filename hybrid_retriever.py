@@ -301,9 +301,14 @@ class HybridRetriever(BaseRetriever):
             variations = self._multiquery(hyde_text)
         else:
             rewritten = query
-            hyde_text = query
             variations = [query]
-        print(f"{bcolors.OKGREEN}Found {len(variations)} variations{bcolors.ENDC}")
+        
+        if self.logging and self.rewrite_query:
+            print(f"{bcolors.OKGREEN}Found {len(variations)} variations{bcolors.ENDC}")
+            print(f"{bcolors.WARNING}- Rewritten: {rewritten}{bcolors.ENDC}")
+            print(f"{bcolors.OKGREEN}- HYDE: {hyde_text}{bcolors.ENDC}")
+            for v in variations:
+                print(f"{bcolors.HEADER}- Variation: {v}{bcolors.ENDC}")
 
         # Derive company hints from the (rewritten) user query
         company_hints = self._extract_company_hints(rewritten)
@@ -366,6 +371,8 @@ class HybridRetriever(BaseRetriever):
         # 5) Sort and diversify across sources
         scored.sort(key=lambda x: x[1], reverse=True)
         diversified = self._diversify(scored, self.k, per_source_cap=2)
+        if(self.logging):
+            print(f"{bcolors.OKGREEN}- total scored: {len(scored)}, Selected  after diversification: {len(diversified)} docs{bcolors.ENDC}")
         
         if self.logging:
             sources = [ (d.metadata or {}).get("source") for d in diversified ]
