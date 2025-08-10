@@ -9,10 +9,9 @@ from langchain.schema import Document
 from langchain_core.retrievers import BaseRetriever
 from langchain_community.chat_models import ChatOllama
 from pydantic import Field, PrivateAttr
-from colors import bcolors
 
-class HybridRetriever(BaseRetriever):
-    #Declare these so Pydantic allows them
+class HybridRetrieverBase(BaseRetriever):
+    # Declare these so Pydantic allows them
     db: object = Field(...)
     embeddings: object = Field(...)
     k: int = Field(default=6)
@@ -32,7 +31,7 @@ class HybridRetriever(BaseRetriever):
         super().__init__(
             db=db,
             embeddings=embeddings,
-            k=k, # chunks to retrieve per query
+            k=k,  # chunks to retrieve per query
             rewrite_query=rewrite_query,
             llm_model=ChatOllama(model=ollama_model),
             logging=logging,
@@ -47,7 +46,7 @@ class HybridRetriever(BaseRetriever):
 
         self._hyde_prompt = PromptTemplate(
             input_variables=["question"],
-            template = (
+            template=(
                 "You are a financial filings expert specializing in U.S. public company disclosures. "
                 "Generate a hypothetical but detailed answer to the question below as if it were extracted from 10-Q or 10-K filings of NYSE-listed companies. "
                 "Use realistic financial terminology, section headers, and language commonly found in SEC filings, including: "
@@ -60,11 +59,6 @@ class HybridRetriever(BaseRetriever):
                 "The goal is to create a richly detailed passage containing as many potentially relevant concepts and terms as possible to maximize matching with real filings in the knowledge base. "
                 "Question: {question}"
             )
-            # template=(
-            #     "You are an expert researcher. Write a hypothetical, detailed answer "
-            #     "to the question below, even if you are not sure of the real answer. "
-            #     "Focus on facts, terminology, and relevant concepts related to the provided data from the knowledge base.\n\nQuestion: {question}"
-            # )
         )
         self._hyde_chain = LLMChain(llm=self.llm_model, prompt=self._hyde_prompt)
 
@@ -108,7 +102,7 @@ class HybridRetriever(BaseRetriever):
         if m:
             qnum = int(m.group(1))
         else:
-            mapping = {"first":1,"second":2,"third":3,"fourth":4}
+            mapping = {"first": 1, "second": 2, "third": 3, "fourth": 4}
             m2 = re.search(r"\b(first|second|third|fourth)\s+quarter\b", text)
             if m2:
                 qnum = mapping[m2.group(1)]
@@ -117,7 +111,7 @@ class HybridRetriever(BaseRetriever):
         m3 = re.search(r"\b(20\d{2})\s*[-–]\s*(20\d{2})\b", text)
         if m3:
             a, b = int(m3.group(1)), int(m3.group(2))
-            dr = (min(a,b), max(a,b))
+            dr = (min(a, b), max(a, b))
         return {
             "prefer_latest": prefer_latest and not prefer_oldest,
             "prefer_oldest": prefer_oldest and not prefer_latest,
@@ -259,7 +253,7 @@ class HybridRetriever(BaseRetriever):
 
         return {"tickers": tickers, "names": names}
 
-    def _company_match(self, md: Dict, hints: Dict[str, Set[str]]) -> bool:
+    def company_match(self, md: Dict, hints: Dict[str, Set[str]]) -> bool:
         """
         Return True if the document's metadata (or source filename) indicates it belongs
         to the target company derived from the query.
@@ -284,98 +278,8 @@ class HybridRetriever(BaseRetriever):
                     if isinstance(item, str):
                         haystacks.append(item.lower())
 
-        # Include chunked source hints like 'tsla-20250331.pdf'
-        # Already captured via 'source' fields above.
-
         for h in tickers.union(names):
             for hay in haystacks:
                 if h in hay:
                     return True
         return False
-
-    def _get_relevant_documents(self, query: str) -> List[Document]:
-        # 1) Query rewriting + HYDE + multiquery
-        if self.rewrite_query:
-            rewritten = self._rewrite(query)
-            hyde_text = self._hyde(rewritten)
-            variations = self._multiquery(hyde_text)
-        else:
-            rewritten = query
-            variations = [query]
-        
-        if self.logging and self.rewrite_query:
-            print(f"{bcolors.OKGREEN}Found {len(variations)} variations{bcolors.ENDC}")
-            print(f"{bcolors.WARNING}- Rewritten: {rewritten}{bcolors.ENDC}")
-            print(f"{bcolors.OKGREEN}- HYDE: {hyde_text}{bcolors.ENDC}")
-            for v in variations:
-                print(f"{bcolors.HEADER}- Variation: {v}{bcolors.ENDC}")
-
-        # Derive company hints from the (rewritten) user query
-        company_hints = self._extract_company_hints(rewritten)
-        if self.logging and (company_hints["tickers"] or company_hints["names"]):
-            print(f"{bcolors.OKGREEN}- Company hints detected: tickers={sorted(company_hints['tickers'])}, names={sorted(company_hints['names'])}{bcolors.ENDC}")
-        
-        # 2) Gather candidate pool (rank-based scoring to avoid distance sign issues)
-        candidate_pool: List[Tuple[Document, int]] = []  # (doc, rank_index)
-        seen_keys = set()
-        fetch_k = max(self.k * 4, 12)
-        
-        for v in variations:
-            results = self.db.similarity_search_with_score(v, k=fetch_k)
-            for rank, (doc, _raw_score) in enumerate(results):
-                key = ( (doc.metadata or {}).get("source"), (doc.metadata or {}).get("chunk_index") )
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
-                candidate_pool.append((doc, rank))
-        
-        if self.logging:
-            print(f"{bcolors.OKGREEN}- Candidate pool size (pre-company filter): {len(candidate_pool)}.{bcolors.ENDC}")
-        
-        if not candidate_pool:
-            return []
-
-        # 2b) Optional company filtering: keep only candidates that match company/ticker/category hints
-        if company_hints["tickers"] or company_hints["names"]:
-            filtered_pool = [(doc, r) for (doc, r) in candidate_pool if self._company_match(doc.metadata, company_hints)]
-            if filtered_pool:
-                candidate_pool = filtered_pool
-                if self.logging:
-                    print(f"{bcolors.OKGREEN}- Candidate pool size (post-company filter): {len(candidate_pool)}.{bcolors.ENDC}")
-            elif self.logging:
-                print(f"{bcolors.WARNING}- No company-matching candidates found; falling back to unfiltered pool.{bcolors.ENDC}")
-        
-        # 3) Temporal and filing-type intent
-        intent = self._parse_temporal_intent(rewritten)
-        type_pref = self._preferred_filing_type(rewritten)
-        
-        # Collect dates for normalization
-        pool_dates: List[datetime] = []
-        for doc, _ in candidate_pool:
-            d = self._to_date((doc.metadata or {}).get("period_end_date")) or self._to_date((doc.metadata or {}).get("filing_date"))
-            if d:
-                pool_dates.append(d)
-        
-        # 4) Score each candidate: final = w_sem*rank + w_time*time + w_type*type
-        w_sem, w_time, w_type = 0.55, 0.35, 0.10
-        max_rank_k = max(1, min(fetch_k, 50))
-        
-        scored: List[Tuple[Document, float]] = []
-        for doc, rank_idx in candidate_pool:
-            rscore = self._rank_score(rank_idx, max_rank_k)
-            tscore = self._time_score(doc, intent, pool_dates)
-            tyscore = self._type_score(doc, type_pref)
-            final = w_sem * rscore + w_time * tscore + w_type * tyscore
-            scored.append((doc, final))
-        
-        # 5) Sort and diversify across sources
-        scored.sort(key=lambda x: x[1], reverse=True)
-        diversified = self._diversify(scored, self.k, per_source_cap=2)
-        if(self.logging):
-            print(f"{bcolors.OKGREEN}- total scored: {len(scored)}, Selected  after diversification: {len(diversified)} docs{bcolors.ENDC}")
-        
-        if self.logging:
-            sources = [ (d.metadata or {}).get("source") for d in diversified ]
-            print(f"{bcolors.OKGREEN}- Selected {len(diversified)} docs from sources: {sources}{bcolors.ENDC}")
-        
-        return diversified

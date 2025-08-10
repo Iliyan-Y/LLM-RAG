@@ -14,7 +14,7 @@ System that will use LLM and vectorDB to generate responses based on custom data
 ```
 VECTORSTORE_DIR=./vectorstore
 OLLAMA_MODEL=gemma3:latest
-SEMANTIC_MODEL_NAME=multi-qa-mpnet-base-cos-v1
+SEMANTIC_MODEL_NAME=intfloat/e5-base-v2
 PDF_DIR=./pdfs
 ```
 

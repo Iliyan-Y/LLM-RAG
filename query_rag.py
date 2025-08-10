@@ -1,9 +1,9 @@
 import os
 import sys
-from hybrid_retriever import HybridRetriever
+from util.hybrid_retriever import HybridRetriever
 from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
-from colors import bcolors
+from util.colors import bcolors
 from langchain_community.chat_models import ChatOllama
 from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
