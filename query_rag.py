@@ -5,6 +5,7 @@ from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
 from colors import bcolors
 from langchain_community.chat_models import ChatOllama
+from langchain.chains import RetrievalQA
 
 VECTORSTORE_DIR = "./vectorstore"
 OLLAMA_MODEL = "gemma3:latest"  # Change to your preferred model
@@ -24,7 +25,6 @@ retriever = HybridRetriever(db=db, embeddings=embeddings, ollama_model=OLLAMA_MO
 llm = ChatOllama(model=OLLAMA_MODEL)
 
 # 3. RetrievalQA Chain
-from langchain.chains import RetrievalQA
 qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever, return_source_documents=True)
 
 # 4. Query loop
@@ -35,7 +35,7 @@ while True:
         if not query:
             continue
         response = qa_chain.invoke(query)
-        print("Answer:", response["result"])
+        print(f"{bcolors.OKBLUE}Answer: {bcolors.ENDC}", response["result"])
         for doc in response["source_documents"]:
             print(f"Source: {doc.metadata['source']}, Chunk: {doc.metadata['chunk_index']}")
     except KeyboardInterrupt:

@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Tuple, Dict, Set
 import re
 from datetime import datetime
 from collections import defaultdict
@@ -221,6 +221,78 @@ class HybridRetriever(BaseRetriever):
                     break
         return out[:k]
 
+    def _extract_company_hints(self, q: str) -> Dict[str, Set[str]]:
+        """
+        Extract potential company identifiers (tickers and names) from the query text.
+        - Tickers: 1-6 uppercase letters, excluding common short words.
+        - Names: Title-cased tokens (e.g., 'Meta', 'Tesla') and common two-token company names if present.
+        Returns lowercase hints for matching.
+        """
+        tickers: Set[str] = set()
+        names: Set[str] = set()
+
+        text = q.strip()
+        # Extract potential tickers (upper-case tokens)
+        ticker_candidates = re.findall(r"\b[A-Z]{1,6}\b", text)
+        stop = {
+            "AND", "OR", "THE", "FOR", "WITH", "WHAT", "HOW", "ARE", "IS", "TO", "IN", "ON",
+            "Q", "Q1", "Q2", "Q3", "Q4", "FY", "SEC", "USD", "EPS", "GAAP", "NONGAAP",
+            "AS", "OF", "VS", "AN", "A", "BY", "FROM", "AT"
+        }
+        for t in ticker_candidates:
+            if t not in stop and not re.fullmatch(r"20\d{2}", t):
+                tickers.add(t.lower())
+
+        # Extract simple TitleCase single-token names (e.g., Meta, Tesla)
+        name_candidates = re.findall(r"\b([A-Z][a-z]+)\b", text)
+        common_noise = {"What", "How", "And", "Or", "For", "With", "The", "Vs", "As", "Of", "In", "On", "Between", "Compared"}
+        for n in name_candidates:
+            if n not in common_noise and len(n) > 2:
+                names.add(n.lower())
+
+        # Extract two-token company names (e.g., 'Meta Platforms', 'Morgan Stanley')
+        two_token_candidates = re.findall(r"\b([A-Z][a-z]+)\s+([A-Z][a-z]+)\b", text)
+        for a, b in two_token_candidates:
+            pair = f"{a} {b}".lower()
+            if a not in common_noise and b not in common_noise:
+                names.add(pair)
+
+        return {"tickers": tickers, "names": names}
+
+    def _company_match(self, md: Dict, hints: Dict[str, Set[str]]) -> bool:
+        """
+        Return True if the document's metadata (or source filename) indicates it belongs
+        to the target company derived from the query.
+        Checks keys: company, category, ticker, cik, source, source_file, source_document, file_name.
+        Performs case-insensitive substring checks against extracted tickers/names.
+        """
+        if not hints or (not hints.get("tickers") and not hints.get("names")):
+            return False
+
+        tickers = hints.get("tickers", set())
+        names = hints.get("names", set())
+
+        md = md or {}
+        keys = ("company", "category", "ticker", "cik", "source", "source_file", "source_document", "file_name")
+        haystacks: List[str] = []
+        for k in keys:
+            v = md.get(k)
+            if isinstance(v, (str,)):
+                haystacks.append(v.lower())
+            elif isinstance(v, (list, tuple)):
+                for item in v:
+                    if isinstance(item, str):
+                        haystacks.append(item.lower())
+
+        # Include chunked source hints like 'tsla-20250331.pdf'
+        # Already captured via 'source' fields above.
+
+        for h in tickers.union(names):
+            for hay in haystacks:
+                if h in hay:
+                    return True
+        return False
+
     def _get_relevant_documents(self, query: str) -> List[Document]:
         # 1) Query rewriting + HYDE + multiquery
         if self.rewrite_query:
@@ -232,15 +304,17 @@ class HybridRetriever(BaseRetriever):
             hyde_text = query
             variations = [query]
         print(f"{bcolors.OKGREEN}Found {len(variations)} variations{bcolors.ENDC}")
-        # if self.logging:
-        #     print(f"- Rewritten query: {rewritten}")
-        #     print(f"- Found {len(variations)} variations for hyde query")
 
+        # Derive company hints from the (rewritten) user query
+        company_hints = self._extract_company_hints(rewritten)
+        if self.logging and (company_hints["tickers"] or company_hints["names"]):
+            print(f"{bcolors.OKGREEN}- Company hints detected: tickers={sorted(company_hints['tickers'])}, names={sorted(company_hints['names'])}{bcolors.ENDC}")
+        
         # 2) Gather candidate pool (rank-based scoring to avoid distance sign issues)
         candidate_pool: List[Tuple[Document, int]] = []  # (doc, rank_index)
         seen_keys = set()
         fetch_k = max(self.k * 4, 12)
-
+        
         for v in variations:
             results = self.db.similarity_search_with_score(v, k=fetch_k)
             for rank, (doc, _raw_score) in enumerate(results):
@@ -249,28 +323,38 @@ class HybridRetriever(BaseRetriever):
                     continue
                 seen_keys.add(key)
                 candidate_pool.append((doc, rank))
-
+        
         if self.logging:
-            print(f"{bcolors.OKGREEN}- Candidate pool size: {len(candidate_pool)}.{bcolors.ENDC}")
-
+            print(f"{bcolors.OKGREEN}- Candidate pool size (pre-company filter): {len(candidate_pool)}.{bcolors.ENDC}")
+        
         if not candidate_pool:
             return []
 
+        # 2b) Optional company filtering: keep only candidates that match company/ticker/category hints
+        if company_hints["tickers"] or company_hints["names"]:
+            filtered_pool = [(doc, r) for (doc, r) in candidate_pool if self._company_match(doc.metadata, company_hints)]
+            if filtered_pool:
+                candidate_pool = filtered_pool
+                if self.logging:
+                    print(f"{bcolors.OKGREEN}- Candidate pool size (post-company filter): {len(candidate_pool)}.{bcolors.ENDC}")
+            elif self.logging:
+                print(f"{bcolors.WARNING}- No company-matching candidates found; falling back to unfiltered pool.{bcolors.ENDC}")
+        
         # 3) Temporal and filing-type intent
         intent = self._parse_temporal_intent(rewritten)
         type_pref = self._preferred_filing_type(rewritten)
-
+        
         # Collect dates for normalization
         pool_dates: List[datetime] = []
         for doc, _ in candidate_pool:
             d = self._to_date((doc.metadata or {}).get("period_end_date")) or self._to_date((doc.metadata or {}).get("filing_date"))
             if d:
                 pool_dates.append(d)
-
+        
         # 4) Score each candidate: final = w_sem*rank + w_time*time + w_type*type
         w_sem, w_time, w_type = 0.55, 0.35, 0.10
         max_rank_k = max(1, min(fetch_k, 50))
-
+        
         scored: List[Tuple[Document, float]] = []
         for doc, rank_idx in candidate_pool:
             rscore = self._rank_score(rank_idx, max_rank_k)
@@ -278,13 +362,13 @@ class HybridRetriever(BaseRetriever):
             tyscore = self._type_score(doc, type_pref)
             final = w_sem * rscore + w_time * tscore + w_type * tyscore
             scored.append((doc, final))
-
+        
         # 5) Sort and diversify across sources
         scored.sort(key=lambda x: x[1], reverse=True)
         diversified = self._diversify(scored, self.k, per_source_cap=2)
-
+        
         if self.logging:
             sources = [ (d.metadata or {}).get("source") for d in diversified ]
             print(f"{bcolors.OKGREEN}- Selected {len(diversified)} docs from sources: {sources}{bcolors.ENDC}")
-
+        
         return diversified
