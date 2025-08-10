@@ -17,8 +17,8 @@ PDF_DIR = os.getenv('PDF_DIR')
 VECTORSTORE_DIR = os.getenv('VECTORSTORE_DIR')
 SEMANTIC_MODEL_NAME = os.getenv('SEMANTIC_MODEL_NAME')#all-mpnet-base-v2" || intfloat/e5-base-v2
 
-CHUNK_SIZE = 350 * 4 # 350 characters * 4 Approx for English finance text  
-CHUNK_OVERLAP = 70 * 4
+CHUNK_SIZE = 400 * 4 # 350 characters * 4 Approx for English finance text  
+CHUNK_OVERLAP = 80 * 4
 
 def _parse_date(text: str) -> Optional[str]:
     """
