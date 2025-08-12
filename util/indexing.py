@@ -127,3 +127,38 @@ def extract_sec_metadata(sample_text: str, file_name: str, dir_name: str) -> Dic
         "category": category,
         "source_file": file_name,
     }
+
+SECTION_PATTERNS = [
+    # MD&A
+    (r"(?i)item\s+7\.*\s+(management[’']?s discussion and analysis.*)", "MD&A"),
+    (r"(?i)management[’']?s discussion and analysis", "MD&A"),
+
+    # Risk factors
+    (r"(?i)item\s+1A\.*\s+(risk factors.*)", "Risk Factors"),
+    (r"(?i)risk factors", "Risk Factors"),
+
+    # Financial statements
+    (r"(?i)consolidated statements? of cash flows?", "Consolidated Statements of Cash Flows"),
+    (r"(?i)consolidated statements? of operations", "Consolidated Statements of Operations"),
+    (r"(?i)consolidated balance sheets?", "Consolidated Balance Sheets"),
+    (r"(?i)notes? to consolidated financial statements?", "Notes to Financial Statements"),
+
+    # Quantitative and qualitative disclosures
+    (r"(?i)item\s+7A\.*\s+(quantitative and qualitative.*)", "Quantitative and Qualitative Disclosures"),
+    
+    # Controls and procedures
+    (r"(?i)item\s+9A\.*\s+(controls and procedures.*)", "Controls and Procedures"),
+
+    # Other
+    (r"(?i)item\s+1\.*\s+(business.*)", "Business"),
+    (r"(?i)item\s+3\.*\s+(legal proceedings.*)", "Legal Proceedings"),
+    (r"(?i)item\s+5\.*\s+(market.*stock.*related.*)", "Market for Registrant's Stock"),
+]
+
+def detect_section_from_text(text: str) -> str:
+    """Try to detect a standard SEC filing section name from chunk text."""
+    snippet = text.strip().replace("\n", " ")[:500]  # only check first part for headings
+    for pattern, label in SECTION_PATTERNS:
+        if re.search(pattern, snippet):
+            return label
+    return ""

@@ -7,7 +7,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 from dotenv import load_dotenv
-from util.indexing import extract_sec_metadata
+from util.indexing import detect_section_from_text, extract_sec_metadata
 
 load_dotenv()
 
@@ -16,7 +16,7 @@ PDF_DIR = os.getenv('PDF_DIR')
 VECTORSTORE_DIR = os.getenv('VECTORSTORE_DIR')
 SEMANTIC_MODEL_NAME = os.getenv('SEMANTIC_MODEL_NAME')#all-mpnet-base-v2" || intfloat/e5-base-v2
 
-CHUNK_SIZE = 400 * 4 # 350 characters * 4 Approx for English finance text  
+CHUNK_SIZE = 450 * 4 # 350 characters * 4 Approx for English finance text  
 CHUNK_OVERLAP = 80 * 4
 
 
@@ -61,15 +61,20 @@ for pdf_path in pdf_files:
         # Preserve any existing metadata from loader
         base_meta = chunk.metadata.copy() if isinstance(chunk.metadata, dict) else {}
         base_meta.update({
+            "creator": "",
+            "producer": "",
             "source": file_name,
-            "source_path": pdf_path,
+            "author": meta_common.get("company"),
+            "title": meta_common.get("filing_type"),
             "category": dir_name,
             "company": meta_common.get("company"),
             "filing_type": meta_common.get("filing_type"),
             "period_end_date": meta_common.get("period_end_date"),
-            "filing_date": meta_common.get("filing_date"),
             "year": meta_common.get("year"),
             "quarter": meta_common.get("quarter"),
+            "section": detect_section_from_text(chunk.page_content),
+            # Todo use multi model for table detection: "doc_type": "table" if is_table(chunk.page_content) else "text",
+            # todo add dedup: "content_hash": hashlib.md5(chunk.page_content.encode()).hexdigest()
             "chunk_index": i,
         })
         chunk.metadata = base_meta

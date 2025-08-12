@@ -99,5 +99,10 @@ class HybridRetriever(HybridRetrieverBase):
         if self.logging:
             sources = [(d.metadata or {}).get("source") for d in diversified]
             print(f"{bcolors.OKGREEN}- Selected {len(diversified)} docs from sources: {sources}{bcolors.ENDC}")
+            for doc in diversified:
+                print(f"{bcolors.FAIL}metadata {doc.metadata} {bcolors.ENDC}")
+                print(f"{bcolors.WARNING}content {doc.page_content} {bcolors.ENDC}")
+
+        diversified.sort(key=lambda x: x.metadata["period_end_date"])
 
         return diversified

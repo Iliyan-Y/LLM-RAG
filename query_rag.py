@@ -14,7 +14,7 @@ load_dotenv()
 VECTORSTORE_DIR = os.getenv('VECTORSTORE_DIR')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL')
 SEMANTIC_MODEL_NAME = os.getenv('SEMANTIC_MODEL_NAME')
-TOTAL_CHUNK_CONTEXT = 12
+TOTAL_CHUNK_CONTEXT = 6
 
 # Options for narrowing the sematic search scope
 qp = QueryProps(rewrite_query=True, allow_multi_query=False, allow_hyde=False)
@@ -45,7 +45,7 @@ while True:
         response = qa_chain.invoke(query)
         print(f"{bcolors.OKBLUE}Answer: {response["result"]} {bcolors.ENDC}\n",)
         for doc in response["source_documents"]:
-            print(f"Source: {doc.metadata['source']}, Chunk: {doc.metadata['chunk_index']}")
+            print(f"Source: {doc.metadata['source']}, filing_type: {doc.metadata['filing_type']}, period: {doc.metadata['period_end_date']}, page: {doc.metadata['page_label']}")
         os.system('afplay /System/Library/Sounds/Hero.aiff')
     except KeyboardInterrupt:
         print("\nExiting.")
