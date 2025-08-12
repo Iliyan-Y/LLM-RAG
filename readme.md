@@ -56,6 +56,9 @@ Notes:
 
 ## How to use
 
+- Follow the steps 1, 2 to create your own vector store dataset (preferred option)
+- or just create vectorstore dir and unzip the test data from vectorstore.zip inside then proceed to step 3
+
 1. Prepare PDFs
 
 - Create a `pdfs/` folder and add your PDFs.

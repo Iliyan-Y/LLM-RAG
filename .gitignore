@@ -2,5 +2,4 @@
 pdfs
 vectorstore
 __pycache__
-*.zip
 .env
