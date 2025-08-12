@@ -35,13 +35,13 @@ class HybridRetrieverBase(BaseRetriever):
     _multiquery_prompt: PromptTemplate = PrivateAttr()
     _multiquery_chain: LLMChain = PrivateAttr()
 
-    def __init__(self, db, embeddings, ollama_model="llama2", query_props= defaultQueryProps, k=6, logging=False, **kwargs):
+    def __init__(self, db, embeddings, ollama_model="llama2", llm_model=None, query_props= defaultQueryProps, k=6, logging=False, **kwargs):
         super().__init__(
             db=db,
             embeddings=embeddings,
             k=k,  # chunks to retrieve per query
             query_props=query_props,
-            llm_model=ChatOllama(model=ollama_model),
+            llm_model= llm_model or ChatOllama(model=ollama_model),
             logging=logging,
             **kwargs
         )

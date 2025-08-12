@@ -1,35 +1,82 @@
 # Basic proof of concept for RAG system
 
-System that will use LLM and vectorDB to generate responses based on custom dataset of PDFs
+System that uses an LLM and a vector DB (FAISS) to answer questions from a custom dataset of PDFs.
 
-- The retrieval and indexing are oriented to parse financial documents but can be modified by changing the keywords and
-  llm actor scripts
+- Retrieval and indexing are biased toward financial filings but can be adapted by changing keywords and prompts.
 
-### Pre req
+## Prerequisites
 
-- python & ollama
-- in queary_rag add your model name e.g. OLLAMA_MODEL = "gemma3:latest"
-- create .env file in the root dir
+- Python 3.10+
+- One of:
+  - Ollama (local models, free to run): https://ollama.com
+  - OpenAI account + API key (for OpenAI-hosted models)
+- Create a `.env` file in the project root (see below)
 
-```
-VECTORSTORE_DIR=./vectorstore
-OLLAMA_MODEL=gemma3:latest
-SEMANTIC_MODEL_NAME=intfloat/e5-base-v2
-PDF_DIR=./pdfs
-```
+## Installation
 
-## Hot to
-
-- In pdfs folder (create one) add all the pdf files you want to store in the vector storage
-- create virtual env and install all the dependencies
-- run the index_pdfs script
-- run the queary_rag to start the chat
+Create and activate a virtual environment, then install dependencies:
 
 ```
+python -m venv .venv
 source .venv/bin/activate
-pip install langchain faiss-cpu sentence-transformers pypdf ollama python-dotenv
+pip install -r requirements.txt
+```
+
+## Configuration (.env)
+
+Minimum (local Ollama by default):
+
+```
+# Vector store and embedding model
+VECTORSTORE_DIR=./vectorstore
+SEMANTIC_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
+
+# PDF source directory for indexing
+PDF_DIR=./pdfs
+
+# LLM provider and models
+LLM_PROVIDER=ollama
+OLLAMA_MODEL=gemma3:latest
+```
+
+To use OpenAI instead of Ollama:
+
+```
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-your-key
+OPENAI_MODEL=gpt-4o-mini
+# Optional custom base if needed:
+# OPENAI_API_BASE=https://api.openai.com/v1
+```
+
+Notes:
+
+- With `LLM_PROVIDER=ollama`, the app uses your local Ollama server and `OLLAMA_MODEL`.
+- With `LLM_PROVIDER=openai`, the app uses OpenAI via `OPENAI_API_KEY` and `OPENAI_MODEL`.
+
+## How to use
+
+1. Prepare PDFs
+
+- Create a `pdfs/` folder and add your PDFs.
+
+2. Index PDFs
+
+```
 python index_pdfs.py
+```
+
+3. Run RAG query loop
+
+```
 python query_rag.py
 ```
 
-- to disconnect from the venv just type `deactivate`
+## Tips
+
+- For Ollama, make sure the model is pulled, e.g.:
+  `ollama pull gemma3:latest`
+
+- For OpenAI, ensure your `OPENAI_API_KEY` is set in `.env`.
+
+- Deactivate the venv with `deactivate` when done.
