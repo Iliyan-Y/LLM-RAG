@@ -19,6 +19,8 @@ from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain_community.chat_models import ChatOllama
 from langchain.chains import RetrievalQA
+from langchain.memory import ConversationBufferWindowMemory
+from contextlib import asynccontextmanager
 
 load_dotenv()
 
@@ -30,7 +32,11 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()  # 'ollama' or 'opena
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 TOTAL_CHUNK_CONTEXT = int(os.getenv("TOTAL_CHUNK_CONTEXT", "6"))
 LOGGING_ENABLED = os.getenv("LOGGING_ENABLED", "false").lower() == "true"
-
+MEMORY_BUF_SIZE = int(os.getenv("MEMORY_BUF_SIZE", 4)) # Number of previous messages 0 = off
+ 
+# Concurrency control for LLM/RAG executions (tune via env MAX_CONCURRENT_LLM)
+MAX_CONCURRENT_LLM = int(os.getenv("MAX_CONCURRENT_LLM", "4"))
+ 
 # Optional: let ollama python client discover a non-local host (docker-compose service)
 # If not set, defaults to localhost
 OLLAMA_HOST = os.getenv("OLLAMA_HOST")  # e.g. http://ollama:11434
@@ -48,6 +54,13 @@ app.add_middleware(
 )
 
 qa_chain: Optional[RetrievalQA] = None
+
+# Global references for building per-session chains (to avoid shared memory)
+retriever_global: Optional[HybridRetriever] = None
+llm_global: Optional[Any] = None
+
+# Semaphore to limit concurrent LLM/RAG executions
+llm_semaphore: asyncio.Semaphore = asyncio.Semaphore(MAX_CONCURRENT_LLM)
 
 
 def init_rag_chain() -> RetrievalQA:
@@ -91,8 +104,13 @@ def init_rag_chain() -> RetrievalQA:
         k=TOTAL_CHUNK_CONTEXT,
         logging=LOGGING_ENABLED,
     )
-
-    # RetrievalQA Chain
+ 
+    # Save components globally so we can create per-session chains with isolated memory
+    global retriever_global, llm_global
+    retriever_global = retriever
+    llm_global = llm
+ 
+    # RetrievalQA Chain without shared memory (per-session memory will be created per connection)
     chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever, return_source_documents=True)
     return chain
 
@@ -112,11 +130,15 @@ def format_sources(source_documents: List[Any]) -> List[Dict[str, Any]]:
     return formatted
 
 
-@app.on_event("startup")
-async def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global qa_chain
-    qa_chain = init_rag_chain()
+    qa_chain =  init_rag_chain()
     print(f"{bcolors.OKGREEN}RAG WS server initialized. Provider={LLM_PROVIDER}{bcolors.ENDC}")
+    yield
+    # Clean up resources here if needed
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/health")
@@ -133,7 +155,9 @@ async def http_query(payload: Dict[str, Any]):
     if not query:
         return JSONResponse(status_code=400, content={"error": "query is required"})
     try:
-        response = qa_chain.invoke(query)
+        # Offload potentially-blocking invoke() to a thread and respect concurrency limits
+        async with llm_semaphore:
+            response = await asyncio.to_thread(qa_chain.invoke, query)
         return {
             "answer": response.get("result"),
             "sources": format_sources(response.get("source_documents", [])),
@@ -146,6 +170,18 @@ async def http_query(payload: Dict[str, Any]):
 async def ws_endpoint(websocket: WebSocket):
     await websocket.accept()
     await websocket.send_text(json.dumps({"type": "welcome", "message": "Connected to RAG WebSocket"}))
+    # Create per-connection memory and session-specific chain so conversations are isolated
+    global retriever_global, llm_global, qa_chain
+    if not qa_chain or not retriever_global or not llm_global:
+        await websocket.send_text(json.dumps({"type":"error","error":"RAG not initialized"}))
+        await websocket.close()
+        return
+    # Effect: Each user gets private conversation memory (k=4). For 100 concurrent users, memory usage increases (roughly proportional to active sessions × messages stored); consider an external memory store or session eviction for scale.
+    if (MEMORY_BUF_SIZE > 0):
+     memory = ConversationBufferWindowMemory(memory_key="chat_history", input_key="query", output_key="result", k=MEMORY_BUF_SIZE, return_messages=True)
+     session_chain = RetrievalQA.from_chain_type(llm=llm_global, retriever=retriever_global, return_source_documents=True, memory=memory)
+    else:
+     session_chain = RetrievalQA.from_chain_type(llm=llm_global, retriever=retriever_global, return_source_documents=True)
     try:
         while True:
             raw = await websocket.receive_text()
@@ -163,8 +199,9 @@ async def ws_endpoint(websocket: WebSocket):
             await websocket.send_text(json.dumps({"type": "status", "message": "processing"}))
 
             try:
-                # Execute RAG
-                response = qa_chain.invoke(query)
+                # Execute RAG (offload to threadpool and respect concurrency limit) using session-specific chain
+                async with llm_semaphore:
+                    response = await asyncio.to_thread(session_chain.invoke, query)
                 message = {
                     "type": "answer",
                     "answer": response.get("result"),

@@ -20,17 +20,16 @@ services:
     # To run with Ollama: docker compose --profile ollama up -d
     # To run without Ollama (OpenAI): docker compose up -d
     profiles: ["default"]
+#   ollama:
+#     image: ollama/ollama:latest
+#     ports:
+#       - "11434:11434"
+#     volumes:
+#       - ollama_models:/root/.ollama
+#     restart: unless-stopped
+#     profiles: ["ollama"]
+#     # Optionally pre-pull a model on container start (uncomment if desired)
+#     # command: ["/bin/sh", "-lc", "ollama serve & sleep 2 && ollama pull ${OLLAMA_MODEL:-gemma3:latest} && wait"]
 
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_models:/root/.ollama
-    restart: unless-stopped
-    profiles: ["ollama"]
-    # Optionally pre-pull a model on container start (uncomment if desired)
-    # command: ["/bin/sh", "-lc", "ollama serve & sleep 2 && ollama pull ${OLLAMA_MODEL:-gemma3:latest} && wait"]
-
-volumes:
-  ollama_models:
+# volumes:
+#   ollama_models:

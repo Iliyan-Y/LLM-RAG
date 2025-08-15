@@ -1,10 +1,7 @@
 # syntax=docker/dockerfile:1.7
 FROM python:3.10-slim AS base
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    HF_HOME=/root/.cache/huggingface
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
@@ -19,30 +16,18 @@ COPY requirements.txt /app/requirements.txt
 
 # Install python deps
 RUN pip install --upgrade pip \
-  && pip install -r /app/requirements.txt
+  && pip install -r /app/requirements.txt \
+  && pip install "huggingface_hub[cli]>=0.23"
 
 # Copy project files
 COPY util/ /app/util/
 COPY index_pdfs.py /app/index_pdfs.py
 COPY query_rag.py /app/query_rag.py
 COPY ws_server.py /app/ws_server.py
-COPY vectorstore.zip /app/vectorstore.zip
+COPY vectorstore/ /app/vectorstore/
+COPY .env /app/.env
 
-# Provide default envs (can be overridden at runtime)
-ENV VECTORSTORE_DIR=/app/vectorstore \
-    SEMANTIC_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2 \
-    LLM_PROVIDER=ollama \
-    OLLAMA_MODEL=gemma3:latest \
-    TOTAL_CHUNK_CONTEXT=6 \
-    LOGGING_ENABLED=false
-
-# Unzip vectorstore if present
-RUN mkdir -p ${VECTORSTORE_DIR} \
-  && if [ -f /app/vectorstore.zip ]; then unzip -o /app/vectorstore.zip -d ${VECTORSTORE_DIR}; fi
-
-# Pre-download embeddings to bake into image cache
-# This prevents first-request downloads in production
-RUN python -c "from sentence_transformers import SentenceTransformer; import os; m=os.getenv('SEMANTIC_MODEL_NAME','sentence-transformers/all-MiniLM-L6-v2'); SentenceTransformer(m)"
+RUN huggingface-cli download "intfloat/e5-base-v2"
 
 # Expose WS/HTTP port
 EXPOSE 8000
