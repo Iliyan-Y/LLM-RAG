@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  rag-ws:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    env_file:
+      - .env
+    environment:
+      # Point LangChain Ollama client to the dockerized Ollama (used only when LLM_PROVIDER=ollama)
+      - OLLAMA_HOST=http://ollama:11434
+      # Ensure default vectorstore path inside container
+      - VECTORSTORE_DIR=/app/vectorstore
+    ports:
+      - "8000:8000"
+    # Enable if you want the service to restart on failure
+    restart: unless-stopped
+    # Use profiles to optionally run ollama. When using OpenAI, you can omit the profile.
+    # To run with Ollama: docker compose --profile ollama up -d
+    # To run without Ollama (OpenAI): docker compose up -d
+    profiles: ["default"]
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+    profiles: ["ollama"]
+    # Optionally pre-pull a model on container start (uncomment if desired)
+    # command: ["/bin/sh", "-lc", "ollama serve & sleep 2 && ollama pull ${OLLAMA_MODEL:-gemma3:latest} && wait"]
+
+volumes:
+  ollama_models:
