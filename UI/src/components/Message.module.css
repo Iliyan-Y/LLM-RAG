@@ -1,0 +1,78 @@
+.processing {
+	position: relative;
+	color: white;
+}
+
+.processing::after {
+	content: "";
+	position: absolute;
+	bottom: 6px;
+	right: -8px;
+	width: 5px;
+	height: 5px;
+	background-color: white;
+	border-radius: 50%;
+	animation: dot1 1s infinite;
+}
+
+.processing::before {
+	content: "";
+	position: absolute;
+	bottom: 0;
+	right: -8px;
+	width: 5px;
+	height: 5px;
+	background-color: white;
+	border-radius: 50%;
+	animation: dot2 1s 0.2s infinite;
+}
+
+@keyframes dot1 {
+	0% {
+		transform: scale(1);
+		background-color: white;
+	}
+	20% {
+		transform: scale(1.2);
+		background-color: #ff99cc; /* light pink */
+	}
+	40% {
+		transform: scale(1.5);
+		background-color: hotpink;
+	}
+	60% {
+		transform: scale(1.2);
+		background-color: #ff99cc; /* light pink */
+	}
+	80% {
+		transform: scale(1);
+		background-color: white;
+	}
+}
+
+@keyframes dot2 {
+	0% {
+		transform: scale(1);
+		background-color: white;
+	}
+	20% {
+		transform: scale(1);
+		background-color: white;
+	}
+	40% {
+		transform: scale(1.2);
+		background-color: #ff99cc; /* light pink */
+	}
+	60% {
+		transform: scale(1.5);
+		background-color: hotpink;
+	}
+	80% {
+		transform: scale(1.2);
+		background-color: #ff99cc; /* light pink */
+	}
+	100% {
+		transform: scale(1);
+		background-color: white;
+	}
+}

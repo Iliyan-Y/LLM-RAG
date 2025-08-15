@@ -1,0 +1,133 @@
+#root {
+	max-width: 1280px;
+	margin: 0 auto;
+	padding: 2rem;
+	text-align: center;
+}
+
+.logo {
+	height: 6em;
+	padding: 1.5em;
+	will-change: filter;
+	transition: filter 300ms;
+}
+.logo:hover {
+	filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+	filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	a:nth-of-type(2) .logo {
+		animation: logo-spin infinite 20s linear;
+	}
+}
+
+.card {
+	padding: 2em;
+}
+
+.read-the-docs {
+	color: #888;
+}
+
+/* Chat UI styles */
+.chat-wrapper {
+	max-width: 760px;
+	margin: 1.5rem auto;
+	background: rgba(0, 0, 0, 0.18);
+	border-radius: 8px;
+	padding: 0.75rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.chat-status {
+	font-size: 0.9rem;
+	text-align: left;
+	padding: 0 0.5rem;
+	color: #bbb;
+}
+
+.messages {
+	height: 320px;
+	overflow: auto;
+	padding: 0.5rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.02);
+}
+
+.message {
+	max-width: 70%;
+	padding: 0.5rem 0.75rem;
+	border-radius: 0.6rem;
+	font-size: 0.95rem;
+	line-height: 1.2;
+	display: inline-block;
+}
+
+.message.me {
+	margin-left: auto;
+	background: linear-gradient(90deg, #4f46e5, #7c3aed);
+	color: white;
+}
+
+.message.other {
+	margin-right: auto;
+	background: rgba(255, 255, 255, 0.06);
+	color: #eaeaea;
+}
+
+.message-meta {
+	font-size: 0.7rem;
+	color: #999;
+	margin-top: 0.25rem;
+	text-align: right;
+}
+
+.composer {
+	display: flex;
+	gap: 0.5rem;
+	padding: 0.25rem;
+}
+
+.composer input {
+	flex: 1;
+	padding: 0.6rem 0.75rem;
+	border-radius: 6px;
+	border: 1px solid rgba(255, 255, 255, 0.06);
+	background: transparent;
+	color: inherit;
+	font-size: 0.95rem;
+}
+
+.composer button {
+	padding: 0.55rem 0.9rem;
+	border-radius: 6px;
+	background: #646cff;
+	color: white;
+	border: none;
+}
+
+@media (max-width: 520px) {
+	.messages {
+		height: 220px;
+	}
+	.message {
+		max-width: 100%;
+	}
+}

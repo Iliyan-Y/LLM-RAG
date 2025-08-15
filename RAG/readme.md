@@ -49,6 +49,20 @@ OPENAI_MODEL=gpt-4o-mini
 # OPENAI_API_BASE=https://api.openai.com/v1
 ```
 
+Example of full .env
+
+```
+VECTORSTORE_DIR=./vectorstore
+OLLAMA_MODEL=gemma3:latest
+SEMANTIC_MODEL_NAME=intfloat/e5-base-v2
+PDF_DIR=./pdfs
+OPENAI_API_KEY=sk-proj-blqblq
+OPENAI_MODEL=gpt-5-mini-2025-08-07
+LLM_PROVIDER=openai
+MEMORY_BUF_SIZE=4
+LOGGING_ENABLED=False
+```
+
 Notes:
 
 - With `LLM_PROVIDER=ollama`, the app uses your local Ollama server and `OLLAMA_MODEL`.
