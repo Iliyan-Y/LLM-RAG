@@ -3,3 +3,4 @@ pdfs
 vectorstore
 __pycache__
 .env
+.DS_Store
