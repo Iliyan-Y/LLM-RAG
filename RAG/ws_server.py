@@ -202,6 +202,11 @@ async def ws_endpoint(websocket: WebSocket):
                 # Execute RAG (offload to threadpool and respect concurrency limit) using session-specific chain
                 async with llm_semaphore:
                     response = await asyncio.to_thread(session_chain.invoke, query)
+                if LOGGING_ENABLED:
+                    print(f"{bcolors.OKBLUE}Answer: {response['result']} {bcolors.ENDC}")
+                    for doc in response["source_documents"]:
+                        print(f"Source: {doc.metadata['source']}, filing_type: {doc.metadata['filing_type']}, period: {doc.metadata['period_end_date']}, page: {doc.metadata['page_label']}")
+
                 message = {
                     "type": "answer",
                     "answer": response.get("result"),

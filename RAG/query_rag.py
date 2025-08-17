@@ -17,7 +17,7 @@ SEMANTIC_MODEL_NAME = os.getenv('SEMANTIC_MODEL_NAME')
 LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'ollama').lower()  # 'ollama' or 'openai'
 OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 TOTAL_CHUNK_CONTEXT = 6
-LOGGING_ENABLED = False
+LOGGING_ENABLED = os.getenv("LOGGING_ENABLED", "false").lower() == "true"
 
 # Options for narrowing the sematic search scope
 qp = QueryProps(rewrite_query=True, allow_multi_query=False, allow_hyde=False)

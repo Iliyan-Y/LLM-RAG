@@ -19,7 +19,6 @@ SEMANTIC_MODEL_NAME = os.getenv('SEMANTIC_MODEL_NAME')#all-mpnet-base-v2" || int
 CHUNK_SIZE = 450 * 4 # 350 characters * 4 Approx for English finance text  
 CHUNK_OVERLAP = 80 * 4
 
-
 # Check PDF dir
 if not os.path.exists(PDF_DIR):
     print(f"PDF directory '{PDF_DIR}' not found. Please create it and add your PDFs.")
@@ -36,9 +35,13 @@ all_chunks = []
 for pdf_path in pdf_files:
     print(f"Loading: {pdf_path}")
 
-    dir_name = os.path.basename(os.path.dirname(pdf_path))
-    file_name = os.path.basename(pdf_path)
-
+    file_name = os.path.basename(pdf_path) 
+    # pdf_path = ./pdfs/Meta/2025/Q1/Meta Q1 2025 brief.pdf
+    paths = pdf_path.split("/")
+    company = paths[2]
+    year = paths[3]
+    quarter = paths[4]
+ 
     loader = PyPDFLoader(pdf_path)
     docs = loader.load()
 
@@ -46,7 +49,7 @@ for pdf_path in pdf_files:
     head_pages = min(5, len(docs))
     sample_text = "\n".join(d.page_content for d in docs[:head_pages])
 
-    meta_common = extract_sec_metadata(sample_text, file_name, dir_name)
+    meta_common = extract_sec_metadata(sample_text, file_name, company)
 
     # Chunking tuned for SEC structure
     splitter = RecursiveCharacterTextSplitter(
@@ -63,15 +66,15 @@ for pdf_path in pdf_files:
         base_meta.update({
             "creator": "",
             "producer": "",
+            "author": "",
+            "creationdate": "",
+            "moddate": "",
             "source": file_name,
-            "author": meta_common.get("company"),
-            "title": meta_common.get("filing_type"),
-            "category": dir_name,
-            "company": meta_common.get("company"),
+            "company": company,
             "filing_type": meta_common.get("filing_type"),
             "period_end_date": meta_common.get("period_end_date"),
-            "year": meta_common.get("year"),
-            "quarter": meta_common.get("quarter"),
+            "year": year,
+            "quarter": quarter,
             "section": detect_section_from_text(chunk.page_content),
             # Todo use multi model for table detection: "doc_type": "table" if is_table(chunk.page_content) else "text",
             # todo add dedup: "content_hash": hashlib.md5(chunk.page_content.encode()).hexdigest()

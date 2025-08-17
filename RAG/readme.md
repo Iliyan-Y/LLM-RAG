@@ -32,6 +32,7 @@ VECTORSTORE_DIR=./vectorstore
 SEMANTIC_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
 
 # PDF source directory for indexing
+# example structure   ./pdfs/Meta/2025/Q1/Meta Q1 2025 brief.pdf
 PDF_DIR=./pdfs
 
 # LLM provider and models
