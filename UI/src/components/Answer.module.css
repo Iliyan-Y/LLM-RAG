@@ -1,0 +1,10 @@
+.container {
+	text-align: left;
+}
+
+.list {
+	font-size: 13px;
+	font-weight: semibold;
+
+	margin: 0 5px;
+}

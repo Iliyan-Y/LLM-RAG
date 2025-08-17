@@ -54,6 +54,8 @@ class HybridRetriever(HybridRetrieverBase):
         if self.logging:
             print(f"{bcolors.OKGREEN}- Candidate pool size (pre-company filter): {len(candidate_pool)}.{bcolors.ENDC}")
 
+            
+
         if not candidate_pool:
             return []
 
@@ -93,27 +95,26 @@ class HybridRetriever(HybridRetrieverBase):
         # scored.sort(key=lambda x: x[1], reverse=True)
         scored.sort(key=lambda x: x[1], reverse=True)
 
-        diversify  = False
+        # TODO add to the env vars
+        diversify = True
         all_docs = []
         if diversify:
             # 5) Sort and diversify across sources
-            all_docs = self._diversify(scored, self.k, per_source_cap=2)
+            all_docs = self._diversify(scored, self.k, per_source_cap=self.k - 2)
             if (self.logging):
                 print(f"{bcolors.OKGREEN}- total scored: {len(scored)}, Selected  after diversification: {len(all_docs)} docs{bcolors.ENDC}")
-            all_docs.sort(key=lambda x: x.metadata["period_end_date"])
         else:
-            for doc, _ in scored:
+            while len(all_docs) < self.k:
                 all_docs.append(doc)
-            all_docs.sort(key=lambda x: x.metadata["page_label"])
-            all_docs.sort(key=lambda x: x.metadata["source"])
-
+            
+        all_docs.sort(key=lambda x: x.metadata["page_label"])
+        all_docs.sort(key=lambda x: x.metadata["source"])
+        
         if self.logging:
             sources = [(d.metadata or {}).get("source") for d in all_docs]
             print(f"{bcolors.OKGREEN}- Selected {len(all_docs)} docs from sources: {sources}{bcolors.ENDC}")
             for doc in all_docs:
                 print(f"{bcolors.FAIL}metadata {doc.metadata} {bcolors.ENDC}")
                 print(f"{bcolors.WARNING}content {doc.page_content} {bcolors.ENDC}")
-
-        
 
         return all_docs

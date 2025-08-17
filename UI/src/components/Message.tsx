@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Message } from "../App";
 import { v4 as uuidv4 } from "uuid";
 import styles from "./Message.module.css";
+import Answer from "./Answer";
 
 type LlmResponse = {
 	answer: string;
@@ -24,6 +25,7 @@ const MessageComponent = ({
 }) => {
 	const [llmResponse, setLlmResponse] = useState<LlmResponse | null>(null);
 	const [showSources, setShowSources] = useState(false);
+	console.log(llmResponse);
 	useEffect(() => {
 		try {
 			const parsed = JSON.parse(message.text);
@@ -49,7 +51,7 @@ const MessageComponent = ({
 						: ""
 				}`}
 			>
-				{llmResponse ? llmResponse.answer : message.text}
+				{llmResponse ? <Answer text={llmResponse.answer} /> : message.text}
 			</div>
 			{llmResponse && llmResponse.sources.length > 0 && (
 				<div>

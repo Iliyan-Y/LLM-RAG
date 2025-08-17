@@ -16,8 +16,8 @@ PDF_DIR = os.getenv('PDF_DIR')
 VECTORSTORE_DIR = os.getenv('VECTORSTORE_DIR')
 SEMANTIC_MODEL_NAME = os.getenv('SEMANTIC_MODEL_NAME')#all-mpnet-base-v2" || intfloat/e5-base-v2
 
-CHUNK_SIZE = 450 * 4 # 350 characters * 4 Approx for English finance text  
-CHUNK_OVERLAP = 80 * 4
+CHUNK_SIZE = 500 * 4 # 350 characters * 4 Approx for English finance text  
+CHUNK_OVERLAP = 100 * 4
 
 # Check PDF dir
 if not os.path.exists(PDF_DIR):
